@@ -33,8 +33,6 @@ AndroidBluetoothService::AndroidBluetoothService(uint16_t portNumber)
 
     QBluetoothServiceInfo::Sequence classId;
     classId << QVariant::fromValue(QBluetoothUuid(QBluetoothUuid::SerialPort));
-    classId << QVariant::fromValue(QBluetoothUuid(QBluetoothUuid::AudioSink));
-    classId << QVariant::fromValue(QBluetoothUuid(QBluetoothUuid::Headset));
     serviceInfo_.setAttribute(QBluetoothServiceInfo::BluetoothProfileDescriptorList, classId);
     classId.prepend(QVariant::fromValue(serviceUuid));
     serviceInfo_.setAttribute(QBluetoothServiceInfo::ServiceClassIds, classId);

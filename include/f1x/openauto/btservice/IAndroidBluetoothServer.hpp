@@ -32,7 +32,7 @@ class IAndroidBluetoothServer
 public:
     virtual ~IAndroidBluetoothServer() = default;
 
-    virtual bool start(const QBluetoothAddress& address, uint16_t portNumber) = 0;
+    virtual uint16_t start(const QBluetoothAddress& address) = 0;
 };
 
 }

@@ -16,43 +16,116 @@
 *  along with openauto. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/algorithm/hex.hpp>
 #include <f1x/openauto/Common/Log.hpp>
 #include <f1x/openauto/btservice/AndroidBluetoothServer.hpp>
+#include <QtCore/QDataStream>
+#include <aasdk_proto/WifiInfoRequestMessage.pb.h>
+#include <aasdk_proto/WifiInfoResponseMessage.pb.h>
 
-namespace f1x
-{
-namespace openauto
-{
-namespace btservice
-{
+namespace f1x {
+    namespace openauto {
+        namespace btservice {
 
-AndroidBluetoothServer::AndroidBluetoothServer()
-    : rfcommServer_(std::make_unique<QBluetoothServer>(QBluetoothServiceInfo::RfcommProtocol, this))
-{
-    connect(rfcommServer_.get(), &QBluetoothServer::newConnection, this, &AndroidBluetoothServer::onClientConnected);
-}
+            AndroidBluetoothServer::AndroidBluetoothServer()
+                    : rfcommServer_(std::make_unique<QBluetoothServer>(QBluetoothServiceInfo::RfcommProtocol, this)) {
+                connect(rfcommServer_.get(), &QBluetoothServer::newConnection, this,
+                        &AndroidBluetoothServer::onClientConnected);
+            }
 
-bool AndroidBluetoothServer::start(const QBluetoothAddress& address, uint16_t portNumber)
-{
-    bool ret = rfcommServer_->listen(address, portNumber);
-    OPENAUTO_LOG(info) << rfcommServer_->serverPort();
-    return ret;
-}
+            uint16_t AndroidBluetoothServer::start(const QBluetoothAddress &address) {
+                if (rfcommServer_->listen(address)) {
+                    return rfcommServer_->serverPort();
+                }
+                return 0;
+            }
 
-void AndroidBluetoothServer::onClientConnected()
-{
-    auto socket = rfcommServer_->nextPendingConnection();
+            void AndroidBluetoothServer::onClientConnected() {
+                if (socket != nullptr) {
+                    OPENAUTO_LOG(info) << "[AndroidBluetoothServer] not accepting new connections, already connected "
+                                       << socket->peerName().toStdString();
+                    return;
+                }
 
-    if(socket != nullptr)
-    {
-        OPENAUTO_LOG(info) << "[AndroidBluetoothServer] rfcomm client connected, peer name: " << socket->peerName().toStdString();
+                socket = rfcommServer_->nextPendingConnection();
+
+                if (socket != nullptr) {
+                    OPENAUTO_LOG(info) << "[AndroidBluetoothServer] rfcomm client connected, peer name: "
+                                       << socket->peerName().toStdString();
+
+                    connect(socket, &QBluetoothSocket::readyRead, this, &AndroidBluetoothServer::readSocket);
+//                    connect(socket, &QBluetoothSocket::disconnected, this,
+//                            QOverload<>::of(&ChatServer::clientDisconnected));
+                } else {
+                    OPENAUTO_LOG(error) << "[AndroidBluetoothServer] received null socket during client connection.";
+                }
+            }
+
+            void AndroidBluetoothServer::readSocket() {
+                buffer += socket->readAll();
+
+                if (buffer.length() < 4) {
+                    OPENAUTO_LOG(debug) << "Not enough data, waiting for more";
+                    return;
+                }
+
+                QDataStream stream(buffer);
+                uint16_t length;
+                stream >> length;
+
+                if (buffer.length() < length + 4) {
+                    OPENAUTO_LOG(info) << "Not enough data, waiting for more: " << buffer.length();
+                    return;
+                }
+
+                uint16_t messageId;
+                stream >> messageId;
+
+                OPENAUTO_LOG(info) << "[AndroidBluetoothServer] " << length << " " << messageId;
+
+                switch (messageId) {
+                    case 1: {
+                        handleWifiInfoRequest(buffer, length);
+                        break;
+                    }
+                    default: {
+                        std::stringstream ss;
+                        ss << std::hex << std::setfill('0');
+                        for (auto &&val : buffer) {
+                            ss << std::setw(2) << static_cast<unsigned>(val);
+                        }
+                        OPENAUTO_LOG(info) << "Unknown message: " << messageId;
+                        OPENAUTO_LOG(info) << ss.str();
+                        break;
+                    }
+                }
+
+                buffer = buffer.mid(length + 4);
+            }
+
+            void AndroidBluetoothServer::handleWifiInfoRequest(QByteArray &buffer, uint16_t length) {
+                f1x::aasdk::proto::data::WifiInfoRequest msg;
+                msg.ParseFromArray(buffer.data(), length);
+                OPENAUTO_LOG(info) << "WifiInfoRequest: " << msg.DebugString();
+
+                f1x::aasdk::proto::data::WifiInfoResponse response;
+
+                int byteSize = response.ByteSize();
+                QByteArray out(byteSize + 4, 0);
+                QDataStream ds(&out, QIODevice::ReadWrite);
+                ds << (uint16_t) byteSize;
+                ds << (uint16_t) 2;
+                response.SerializeToArray(out.data() + 4, byteSize);
+
+                std::stringstream ss;
+                ss << std::hex << std::setfill('0');
+                for (auto &&val : out) {
+                    ss << std::setw(2) << static_cast<unsigned>(val);
+                }
+                OPENAUTO_LOG(info) << "Writing message: " << ss.str();
+
+                //socket->write(out.data());
+            }
+        }
     }
-    else
-    {
-        OPENAUTO_LOG(error) << "[AndroidBluetoothServer] received null socket during client connection.";
-    }
-}
-
-}
-}
 }

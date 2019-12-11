@@ -37,13 +37,20 @@ class AndroidBluetoothServer: public QObject, public IAndroidBluetoothServer
 public:
     AndroidBluetoothServer();
 
-    bool start(const QBluetoothAddress& address, uint16_t portNumber) override;
+    uint16_t start(const QBluetoothAddress& address) override;
 
 private slots:
     void onClientConnected();
 
 private:
     std::unique_ptr<QBluetoothServer> rfcommServer_;
+    QBluetoothSocket* socket = nullptr;
+
+    void readSocket();
+
+    QByteArray buffer;
+
+    void handleWifiInfoRequest(QByteArray &buffer, uint16_t length);
 };
 
 }

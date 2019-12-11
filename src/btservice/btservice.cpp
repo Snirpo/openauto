@@ -30,15 +30,16 @@ int main(int argc, char *argv[]) {
 
     QBluetoothLocalDevice localDevice;
     const QBluetoothAddress address = localDevice.address();
-    const uint16_t portNumber = 5000;
 
     // Turn Bluetooth on
     localDevice.powerOn();
     // Make it visible to others
-    //localDevice.setHostMode(QBluetoothLocalDevice::HostConnectable);
+    localDevice.setHostMode(QBluetoothLocalDevice::HostDiscoverable);
 
     btservice::AndroidBluetoothServer androidBluetoothServer;
-    if (!androidBluetoothServer.start(address, portNumber)) {
+    uint16_t portNumber = androidBluetoothServer.start(address);
+
+    if (portNumber == 0) {
         OPENAUTO_LOG(error) << "[btservice] Server start failed.";
         return 2;
     }
