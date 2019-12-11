@@ -22,6 +22,7 @@
 #include <memory>
 #include <QBluetoothServer>
 #include <f1x/openauto/btservice/IAndroidBluetoothServer.hpp>
+#include <f1x/aasdk/Messenger/Message.hpp>
 
 namespace f1x
 {
@@ -51,6 +52,10 @@ private:
     QByteArray buffer;
 
     void handleWifiInfoRequest(QByteArray &buffer, uint16_t length);
+
+    void sendMessage(const google::protobuf::Message &message, uint16_t type);
+
+    void handleWifiSecurityRequest(QByteArray &buffer, uint16_t length);
 };
 
 }

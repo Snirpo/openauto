@@ -22,6 +22,7 @@
 #include <QtCore/QDataStream>
 #include <aasdk_proto/WifiInfoRequestMessage.pb.h>
 #include <aasdk_proto/WifiInfoResponseMessage.pb.h>
+#include <aasdk_proto/WifiSecurityResponseMessage.pb.h>
 
 namespace f1x {
     namespace openauto {
@@ -42,9 +43,7 @@ namespace f1x {
 
             void AndroidBluetoothServer::onClientConnected() {
                 if (socket != nullptr) {
-                    OPENAUTO_LOG(info) << "[AndroidBluetoothServer] not accepting new connections, already connected "
-                                       << socket->peerName().toStdString();
-                    return;
+                    socket->deleteLater();
                 }
 
                 socket = rfcommServer_->nextPendingConnection();
@@ -63,6 +62,8 @@ namespace f1x {
 
             void AndroidBluetoothServer::readSocket() {
                 buffer += socket->readAll();
+
+                OPENAUTO_LOG(info) << "Received message";
 
                 if (buffer.length() < 4) {
                     OPENAUTO_LOG(debug) << "Not enough data, waiting for more";
@@ -84,10 +85,12 @@ namespace f1x {
                 OPENAUTO_LOG(info) << "[AndroidBluetoothServer] " << length << " " << messageId;
 
                 switch (messageId) {
-                    case 1: {
+                    case 1:
                         handleWifiInfoRequest(buffer, length);
                         break;
-                    }
+                    case 2:
+                        handleWifiSecurityRequest(buffer, length);
+                        break;
                     default: {
                         std::stringstream ss;
                         ss << std::hex << std::setfill('0');
@@ -104,18 +107,37 @@ namespace f1x {
             }
 
             void AndroidBluetoothServer::handleWifiInfoRequest(QByteArray &buffer, uint16_t length) {
-                f1x::aasdk::proto::data::WifiInfoRequest msg;
+                f1x::aasdk::proto::messages::WifiInfoRequest msg;
                 msg.ParseFromArray(buffer.data(), length);
                 OPENAUTO_LOG(info) << "WifiInfoRequest: " << msg.DebugString();
 
-                f1x::aasdk::proto::data::WifiInfoResponse response;
+                f1x::aasdk::proto::messages::WifiInfoResponse response;
+                response.set_ip_address("192.168.1.10");
+                response.set_port(5000);
+                response.set_status(aasdk::proto::messages::WifiInfoResponse_Status_STATUS_SUCCESS);
 
-                int byteSize = response.ByteSize();
+                sendMessage(response, 7);
+            }
+
+            void AndroidBluetoothServer::handleWifiSecurityRequest(QByteArray &buffer, uint16_t length) {
+                f1x::aasdk::proto::messages::WifiSecurityReponse response;
+
+                response.set_ssid("aaa");
+                response.set_bssid("a0:f3:c1:07:f4:c4");
+                response.set_key("jehebteenkakhoofd");
+                response.set_security_mode(aasdk::proto::messages::WifiSecurityReponse_SecurityMode_WPA2_PERSONAL);
+                response.set_access_point_type(aasdk::proto::messages::WifiSecurityReponse_AccessPointType_STATIC);
+
+                sendMessage(response, 3);
+            }
+
+            void AndroidBluetoothServer::sendMessage(const google::protobuf::Message& message, uint16_t type) {
+                int byteSize = message.ByteSize();
                 QByteArray out(byteSize + 4, 0);
                 QDataStream ds(&out, QIODevice::ReadWrite);
                 ds << (uint16_t) byteSize;
-                ds << (uint16_t) 2;
-                response.SerializeToArray(out.data() + 4, byteSize);
+                ds << type;
+                message.SerializeToArray(out.data() + 4, byteSize);
 
                 std::stringstream ss;
                 ss << std::hex << std::setfill('0');
@@ -124,7 +146,12 @@ namespace f1x {
                 }
                 OPENAUTO_LOG(info) << "Writing message: " << ss.str();
 
-                //socket->write(out.data());
+                qint64 written = socket->write(out);
+                if (written > -1) {
+                    OPENAUTO_LOG(info) << "Bytes written: " << written;
+                } else {
+                    OPENAUTO_LOG(info) << "Could not write data";
+                }
             }
         }
     }
