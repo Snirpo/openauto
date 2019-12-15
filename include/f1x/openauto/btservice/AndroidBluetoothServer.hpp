@@ -56,6 +56,8 @@ private:
     void sendMessage(const google::protobuf::Message &message, uint16_t type);
 
     void handleWifiSecurityRequest(QByteArray &buffer, uint16_t length);
+
+    void handleWifiInfoRequestResponse(QByteArray &buffer, uint16_t length);
 };
 
 }

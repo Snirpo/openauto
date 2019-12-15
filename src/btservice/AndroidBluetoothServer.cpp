@@ -55,6 +55,12 @@ namespace f1x {
                     connect(socket, &QBluetoothSocket::readyRead, this, &AndroidBluetoothServer::readSocket);
 //                    connect(socket, &QBluetoothSocket::disconnected, this,
 //                            QOverload<>::of(&ChatServer::clientDisconnected));
+
+                    f1x::aasdk::proto::messages::WifiInfoRequest request;
+                    request.set_ip_address("192.168.1.10");
+                    request.set_port(5000);
+
+                    sendMessage(request, 1);
                 } else {
                     OPENAUTO_LOG(error) << "[AndroidBluetoothServer] received null socket during client connection.";
                 }
@@ -90,6 +96,9 @@ namespace f1x {
                         break;
                     case 2:
                         handleWifiSecurityRequest(buffer, length);
+                        break;
+                    case 7:
+                        handleWifiInfoRequestResponse(buffer, length);
                         break;
                     default: {
                         std::stringstream ss;
@@ -152,6 +161,12 @@ namespace f1x {
                 } else {
                     OPENAUTO_LOG(info) << "Could not write data";
                 }
+            }
+
+            void AndroidBluetoothServer::handleWifiInfoRequestResponse(QByteArray &buffer, uint16_t length) {
+                f1x::aasdk::proto::messages::WifiInfoResponse msg;
+                msg.ParseFromArray(buffer.data(), length);
+                OPENAUTO_LOG(info) << "WifiInfoResponse: " << msg.DebugString();
             }
         }
     }
