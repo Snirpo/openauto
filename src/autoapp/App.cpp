@@ -38,6 +38,7 @@ App::App(boost::asio::io_service& ioService, aasdk::usb::USBWrapper& usbWrapper,
     , androidAutoEntityFactory_(androidAutoEntityFactory)
     , usbHub_(std::move(usbHub))
     , connectedAccessoriesEnumerator_(std::move(connectedAccessoriesEnumerator))
+    , acceptor_(ioService, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 5000 ))
     , isStopped_(false)
 {
 
@@ -69,17 +70,28 @@ void App::waitForUSBDevice()
 void App::start(aasdk::tcp::ITCPEndpoint::SocketPointer socket)
 {
     strand_.dispatch([this, self = this->shared_from_this(), socket = std::move(socket)]() mutable {
+        OPENAUTO_LOG(info) << "Start from socket";
         if(androidAutoEntity_ != nullptr)
         {
-            tcpWrapper_.close(*socket);
-            OPENAUTO_LOG(warning) << "[App] android auto entity is still running.";
-            return;
+//            tcpWrapper_.close(*socket);
+//            OPENAUTO_LOG(warning) << "[App] android auto entity is still running.";
+//            return;
+            try {
+                androidAutoEntity_->stop();
+            } catch (...) {
+                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_->stop();";
+            }
+            try {
+                androidAutoEntity_.reset();
+            } catch (...) {
+                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_.reset();";
+            }
         }
 
         try
         {
-            usbHub_->cancel();
-            connectedAccessoriesEnumerator_->cancel();
+//            usbHub_->cancel();
+//            connectedAccessoriesEnumerator_->cancel();
 
             auto tcpEndpoint(std::make_shared<aasdk::tcp::TCPEndpoint>(tcpWrapper_, std::move(socket)));
             androidAutoEntity_ = androidAutoEntityFactory_.create(std::move(tcpEndpoint));
@@ -89,7 +101,7 @@ void App::start(aasdk::tcp::ITCPEndpoint::SocketPointer socket)
         {
             OPENAUTO_LOG(error) << "[App] TCP AndroidAutoEntity create error: " << error.what();
 
-            androidAutoEntity_.reset();
+            //androidAutoEntity_.reset();
             this->waitForDevice();
         }
     });
@@ -181,6 +193,25 @@ void App::waitForDevice()
     promise->then(std::bind(&App::aoapDeviceHandler, this->shared_from_this(), std::placeholders::_1),
                   std::bind(&App::onUSBHubError, this->shared_from_this(), std::placeholders::_1));
     usbHub_->start(std::move(promise));
+    startServerSocket();
+}
+
+void App::startServerSocket() {
+    strand_.dispatch([this, self = this->shared_from_this()]() {
+        OPENAUTO_LOG(info) << "Listening for WIFI clients on port 5000";
+        auto socket = std::make_shared<boost::asio::ip::tcp::socket>(ioService_);
+        acceptor_.async_accept(
+                *socket,
+                std::bind(&App::handleNewClient, this, socket, std::placeholders::_1)
+        );
+    });
+}
+
+void App::handleNewClient(std::shared_ptr<boost::asio::ip::tcp::socket> socket, const boost::system::error_code &err) {
+    OPENAUTO_LOG(info) << "WIFI Client connected";
+    if (!err) {
+        start(std::move(socket));
+    }
 }
 
 void App::pause()
@@ -209,26 +240,29 @@ void App::onAndroidAutoQuit()
     strand_.dispatch([this, self = this->shared_from_this()]() {
         OPENAUTO_LOG(info) << "[App] onAndroidAutoQuit.";
 
-        try {
-            androidAutoEntity_->stop();
-        } catch (...) {
-            OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_->stop();";
-        }
-        try {
-            androidAutoEntity_.reset();
-        } catch (...) {
-            OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_.reset();";
-        }
+        //acceptor_.close();
 
-        if(!isStopped_)
-        {
+        if (androidAutoEntity_ != nullptr) {
             try {
-                this->waitForDevice();
+                androidAutoEntity_->stop();
             } catch (...) {
-                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by this->waitForDevice();";
+                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_->stop();";
             }
-
+            try {
+                androidAutoEntity_.reset();
+            } catch (...) {
+                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by androidAutoEntity_.reset();";
+            }
         }
+
+//        if(!isStopped_)
+//        {
+//            try {
+//                this->waitForDevice();
+//            } catch (...) {
+//                OPENAUTO_LOG(error) << "[App] onAndroidAutoQuit: exception caused by this->waitForDevice();";
+//            }
+//        }
     });
 }
 

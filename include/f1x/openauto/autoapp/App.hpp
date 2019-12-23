@@ -59,12 +59,17 @@ private:
     boost::asio::io_service& ioService_;
     aasdk::usb::USBWrapper& usbWrapper_;
     aasdk::tcp::ITCPWrapper& tcpWrapper_;
+    boost::asio::ip::tcp::acceptor acceptor_;
     boost::asio::io_service::strand strand_;
     service::IAndroidAutoEntityFactory& androidAutoEntityFactory_;
     aasdk::usb::IUSBHub::Pointer usbHub_;
     aasdk::usb::IConnectedAccessoriesEnumerator::Pointer connectedAccessoriesEnumerator_;
     service::IAndroidAutoEntity::Pointer androidAutoEntity_;
     bool isStopped_;
+
+    void startServerSocket();
+
+    void handleNewClient(std::shared_ptr<boost::asio::ip::tcp::socket> socket, const boost::system::error_code &err);
 };
 
 }

@@ -55,10 +55,10 @@ void WifiService::fillFeatures(aasdk::proto::messages::ServiceDiscoveryResponse&
     OPENAUTO_LOG(info) << "[WifiService] fill features.";
 
     auto* channelDescriptor = response.add_channels();
-    channelDescriptor->set_channel_id(static_cast<uint32_t>(14));
+    channelDescriptor->set_channel_id(14);
 
     auto* channel = channelDescriptor->mutable_wifi_channel();
-    channel->set_ssid("aaa");
+    channel->set_ssid("ChiPri");
 }
 
 }
