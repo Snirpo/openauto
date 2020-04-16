@@ -29,7 +29,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-g -O3")
 
 if (APPLE)
-    set(Qt5_DIR /usr/local/Qt-5.13.2/lib/cmake/Qt5)
+    set(Qt5_DIR /usr/local/opt/qt/lib/cmake/Qt5)
     set(OPENSSL_ROOT_DIR /usr/local/opt/openssl)
 endif(APPLE)
 
@@ -43,10 +43,10 @@ find_package(taglib REQUIRED)
 find_package(blkid REQUIRED)
 
 ### TODO: Should not be done this way? ###
-set(AASDK_LIBRARIES /usr/local/lib/libaasdk.so)
 set(AASDK_INCLUDE_DIRS /usr/local/include/aasdk)
-set(AASDK_PROTO_LIBRARIES /usr/local/lib/libaasdk_proto.so)
 set(AASDK_PROTO_INCLUDE_DIRS /usr/local/include/aasdk_proto)
+set(AASDK_LIBRARIES /usr/local/lib/libaasdk.so)
+set(AASDK_PROTO_LIBRARIES /usr/local/lib/libaasdk_proto.so)
 ###
 
 if(WIN32)
@@ -54,8 +54,8 @@ if(WIN32)
 endif(WIN32)
 
 if (APPLE)
-    set(OPENSSL_INCLUDE_DIR /usr/local/opt/openssl/include)
-    set(OPENSSL_LIBRARIES /usr/local/opt/openssl/lib/libssl.dylib;/usr/local/opt/openssl/lib/libcrypto.dylib)
+    set(AASDK_LIBRARIES /usr/local/lib/libaasdk.dylib)
+    set(AASDK_PROTO_LIBRARIES /usr/local/lib/libaasdk_proto.dylib)
 endif(APPLE)
 
 if(RPI3_BUILD)
